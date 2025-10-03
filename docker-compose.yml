@@ -1,0 +1,25 @@
+services:
+  hebtts-api:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount HebTTSLM directory to ensure checkpoint and models are available
+      - "./HebTTSLM:/app/HebTTSLM"
+    environment:
+      - FLASK_DEBUG=false
+      - PORT=5000
+    deploy:
+      resources:
+        limits:
+          memory: 24G
+        reservations:
+          memory: 16G
+    # For GPU support (uncomment if you have nvidia-docker)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
