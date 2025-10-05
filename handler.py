@@ -3,6 +3,7 @@ import sys
 import runpod
 import tempfile
 import base64
+import logging
 from pathlib import Path
 from omegaconf import OmegaConf
 
@@ -11,6 +12,8 @@ sys.path.insert(0, str(Path(__file__).parent / "HebTTSLM"))
 
 from HebTTSLM.infer import prepare_inference, infer_texts
 from HebTTSLM.utils import AttributeDict
+from chunked_inference import infer_chunked_text
+from text_chunker import HebrewTextChunker
 
 # Global variables for model (loaded once at startup)
 model_components = None
@@ -71,10 +74,12 @@ def handler(job):
         "input": {
             "text": "Hebrew text here",
             "speaker": "osim",
-            "top_k": 15,
-            "temperature": 0.6,
+            "top_k": 50,
+            "temperature": 1,
             "use_mbd": true,
-            "filename": "output"
+            "filename": "output",
+            "enable_chunking": true,
+            "max_chunk_chars": 150
         }
     }
     """
@@ -93,6 +98,8 @@ def handler(job):
         temperature = job_input.get("temperature", 0.6)
         use_mbd = job_input.get("use_mbd", True)
         filename = job_input.get("filename", "output")
+        enable_chunking = job_input.get("enable_chunking", True)
+        max_chunk_chars = job_input.get("max_chunk_chars", 150)
         
         # Validate inputs
         if not text.strip():
@@ -112,48 +119,100 @@ def handler(job):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir)
             
-            # Prepare text input
-            texts_with_filenames = [(filename, text)]
-            
             # Create custom args with user's MBD preference
             custom_args = AttributeDict(model_components['args'])
             custom_args.mbd = use_mbd
             
-            # Generate audio
-            infer_texts(
-                texts_with_filenames=texts_with_filenames,
-                output_dir=str(output_dir),
-                prompt_text=prompt_text,
-                device=model_components['device'],
-                model=model_components['model'],
-                text_collater=model_components['text_collater'],
-                audio_tokenizer=model_components['audio_tokenizer'],
-                alef_bert_tokenizer=model_components['alef_bert_tokenizer'],
-                audio_prompts=model_components['audio_prompts'],
-                top_k=top_k,
-                temperature=temperature,
-                args=custom_args
-            )
+            # Check if chunking is needed and enabled
+            chunker = HebrewTextChunker(max_chunk_chars)
+            should_chunk = enable_chunking and not chunker.is_chunk_valid(text)
             
-            # Read generated audio
-            audio_file_path = output_dir / f"{filename}.wav"
-            
-            if not audio_file_path.exists():
-                return {"error": "Audio generation failed"}
-            
-            # Read audio file as base64
-            with open(audio_file_path, 'rb') as f:
-                audio_data = f.read()
-            
-            audio_base64 = base64.b64encode(audio_data).decode('utf-8')
-            
-            # Return audio as base64 in output
-            return {
-                "audio_base64": audio_base64,
-                "filename": f"{filename}.wav",
-                "sample_rate": 24000,
-                "format": "wav"
-            }
+            if should_chunk:
+                print(f"Text is {len(text)} characters, using chunking with max {max_chunk_chars} chars per chunk")
+                
+                # Use chunked inference
+                success, audio_file_path, chunk_info = infer_chunked_text(
+                    text=text,
+                    output_dir=str(output_dir),
+                    prompt_text=prompt_text,
+                    device=model_components['device'],
+                    model=model_components['model'],
+                    text_collater=model_components['text_collater'],
+                    audio_tokenizer=model_components['audio_tokenizer'],
+                    alef_bert_tokenizer=model_components['alef_bert_tokenizer'],
+                    audio_prompts=model_components['audio_prompts'],
+                    top_k=top_k,
+                    temperature=temperature,
+                    args=custom_args,
+                    base_filename=filename,
+                    max_chars=max_chunk_chars
+                )
+                
+                if not success or not audio_file_path or not audio_file_path.exists():
+                    return {
+                        "error": "Chunked audio generation failed",
+                        "chunk_info": chunk_info
+                    }
+                
+                # Read generated audio
+                with open(audio_file_path, 'rb') as f:
+                    audio_data = f.read()
+                
+                audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+                
+                # Return audio with chunking info
+                return {
+                    "audio_base64": audio_base64,
+                    "filename": f"{filename}.wav",
+                    "sample_rate": 24000,
+                    "format": "wav",
+                    "chunked": True,
+                    "chunk_info": chunk_info,
+                    "original_length": len(text),
+                    "chunks_processed": len(chunk_info)
+                }
+            else:
+                print(f"Text is {len(text)} characters, processing as single chunk")
+                
+                # Use standard inference for short texts
+                texts_with_filenames = [(filename, text)]
+                
+                infer_texts(
+                    texts_with_filenames=texts_with_filenames,
+                    output_dir=str(output_dir),
+                    prompt_text=prompt_text,
+                    device=model_components['device'],
+                    model=model_components['model'],
+                    text_collater=model_components['text_collater'],
+                    audio_tokenizer=model_components['audio_tokenizer'],
+                    alef_bert_tokenizer=model_components['alef_bert_tokenizer'],
+                    audio_prompts=model_components['audio_prompts'],
+                    top_k=top_k,
+                    temperature=temperature,
+                    args=custom_args
+                )
+                
+                # Read generated audio
+                audio_file_path = output_dir / f"{filename}.wav"
+                
+                if not audio_file_path.exists():
+                    return {"error": "Audio generation failed"}
+                
+                # Read audio file as base64
+                with open(audio_file_path, 'rb') as f:
+                    audio_data = f.read()
+                
+                audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+                
+                # Return audio as base64 in output
+                return {
+                    "audio_base64": audio_base64,
+                    "filename": f"{filename}.wav",
+                    "sample_rate": 24000,
+                    "format": "wav",
+                    "chunked": False,
+                    "original_length": len(text)
+                }
             
     except Exception as e:
         print(f"Error in handler: {str(e)}")

@@ -6,6 +6,8 @@ services:
     volumes:
       # Mount HebTTSLM directory to ensure checkpoint and models are available
       - "./HebTTSLM:/app/HebTTSLM"
+      # Mount cache directories for persistent storage of downloaded models
+      - "./cache:/cache"
     environment:
       - FLASK_DEBUG=false
       - PORT=5000
