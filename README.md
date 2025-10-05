@@ -56,6 +56,14 @@ pip install -r requirements.txt
 docker-compose up
 ```
 
+## Known Issues
+
+### Shaul Speaker Audio Bleeding
+The "Shaul" speaker may occasionally have brief artifacts from the reference audio at sentence boundaries. This happens because Shaul's reference prompt is longer than other speakers, causing over-conditioning during generation. To minimize this:
+- Use shorter texts when possible with Shaul speaker
+- Consider using "osim" or "geek" speakers for cleaner output
+- This is a model generation artifact, not a bug
+
 ## Deployment
 
 Deploy to **RunPod Serverless** with existing Docker configuration. No changes needed - chunking works automatically.

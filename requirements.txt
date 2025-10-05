@@ -11,3 +11,4 @@ matplotlib>=3.10.3
 numpy<2
 phonemizer>=3.3.0
 torchmetrics>=1.7.2
+num2words>=0.5.12

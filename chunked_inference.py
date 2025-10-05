@@ -116,11 +116,24 @@ def infer_chunked_text(
     
     try:
         # Prepare chunked texts
+        logger.info(f"Starting chunked inference for text of {len(text)} characters")
+        logger.debug(f"Input text preview: {text[:100]}{'...' if len(text) > 100 else ''}")
+        
         texts_with_filenames, is_chunked = prepare_chunked_texts(
             text, base_filename, max_chars
         )
         
-        logger.info(f"Processing {'chunked' if is_chunked else 'single'} text: {len(texts_with_filenames)} parts")
+        logger.info(f"prepare_chunked_texts returned: {len(texts_with_filenames)} parts, is_chunked={is_chunked}")
+        
+        # Validate that we have chunks to process
+        if not texts_with_filenames:
+            logger.error("No text chunks were prepared for processing")
+            return False, None, []
+        
+        # Log chunk details for debugging
+        for i, (filename, chunk_text) in enumerate(texts_with_filenames):
+            logger.info(f"Chunk {i+1}: {filename} - {len(chunk_text)} chars")
+            logger.debug(f"Chunk {i+1} text: {chunk_text[:50]}{'...' if len(chunk_text) > 50 else ''}")
         
         # Process each chunk
         chunk_audio_files = []
@@ -130,30 +143,39 @@ def infer_chunked_text(
             logger.info(f"Processing chunk {i+1}/{len(texts_with_filenames)}: {filename}")
             logger.debug(f"Chunk text ({len(chunk_text)} chars): {chunk_text[:100]}{'...' if len(chunk_text) > 100 else ''}")
             
-            # Process single chunk
-            infer_texts(
-                texts_with_filenames=[(filename, chunk_text)],
-                output_dir=str(output_path),
-                prompt_text=prompt_text,
-                device=device,
-                model=model,
-                text_collater=text_collater,
-                audio_tokenizer=audio_tokenizer,
-                alef_bert_tokenizer=alef_bert_tokenizer,
-                audio_prompts=audio_prompts,
-                top_k=top_k,
-                temperature=temperature,
-                args=args
-            )
-            
-            # Check if audio file was created
-            chunk_audio_path = output_path / f"{filename}.wav"
-            if chunk_audio_path.exists():
-                chunk_audio_files.append(chunk_audio_path)
-                chunk_info.append(f"{filename}: {len(chunk_text)} chars")
-                logger.info(f"Generated audio for chunk {i+1}: {chunk_audio_path}")
-            else:
-                logger.error(f"Failed to generate audio for chunk {i+1}: {filename}")
+            try:
+                # Process single chunk
+                infer_texts(
+                    texts_with_filenames=[(filename, chunk_text)],
+                    output_dir=str(output_path),
+                    prompt_text=prompt_text,
+                    device=device,
+                    model=model,
+                    text_collater=text_collater,
+                    audio_tokenizer=audio_tokenizer,
+                    alef_bert_tokenizer=alef_bert_tokenizer,
+                    audio_prompts=audio_prompts,
+                    top_k=top_k,
+                    temperature=temperature,
+                    args=args
+                )
+                
+                # Check if audio file was created
+                chunk_audio_path = output_path / f"{filename}.wav"
+                if chunk_audio_path.exists():
+                    chunk_audio_files.append(chunk_audio_path)
+                    chunk_info.append(f"{filename}: {len(chunk_text)} chars")
+                    logger.info(f"Generated audio for chunk {i+1}: {chunk_audio_path}")
+                else:
+                    logger.error(f"Failed to generate audio for chunk {i+1}: {filename} - output file not created")
+                    # Add debug info about directory contents
+                    logger.debug(f"Output directory contents: {list(output_path.glob('*'))}")
+                    return False, None, chunk_info
+                    
+            except Exception as chunk_error:
+                logger.error(f"Exception while processing chunk {i+1}: {chunk_error}")
+                import traceback
+                logger.error(traceback.format_exc())
                 return False, None, chunk_info
         
         # If only one chunk, return it directly

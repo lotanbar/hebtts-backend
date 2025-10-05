@@ -207,6 +207,11 @@ class HebrewTextChunker:
         for i, chunk in enumerate(valid_chunks):
             self.logger.debug(f"Chunk {i+1}: {len(chunk)} chars, ~{self.estimate_token_count(chunk)} tokens")
         
+        # If no valid chunks were created, return the original text as a single chunk
+        if not valid_chunks and text.strip():
+            self.logger.warning("No valid chunks created, returning original text as single chunk")
+            return [text.strip()]
+        
         return valid_chunks
 
 
@@ -222,20 +227,38 @@ def prepare_chunked_texts(text: str, base_filename: str = "output", max_chars: i
     Returns:
         Tuple of (list of (filename, text) pairs, is_chunked_flag)
     """
-    chunker = HebrewTextChunker(max_chars)
-    chunks = chunker.chunk_text(text)
+    logger = logging.getLogger(__name__)
+    logger.info(f"prepare_chunked_texts called with text_length={len(text)}, max_chars={max_chars}")
+    logger.debug(f"Input text: {text[:100]}{'...' if len(text) > 100 else ''}")
     
-    if len(chunks) <= 1:
-        # Single chunk or no chunking needed
-        return [(base_filename, chunks[0] if chunks else text)], False
-    else:
-        # Multiple chunks - add sequence numbers
-        texts_with_filenames = []
-        for i, chunk in enumerate(chunks):
-            filename = f"{base_filename}_part_{i+1:03d}_of_{len(chunks):03d}"
-            texts_with_filenames.append((filename, chunk))
+    try:
+        chunker = HebrewTextChunker(max_chars)
+        chunks = chunker.chunk_text(text)
         
-        return texts_with_filenames, True
+        logger.info(f"Chunker returned {len(chunks)} chunks")
+        
+        if len(chunks) <= 1:
+            # Single chunk or no chunking needed
+            result_text = chunks[0] if chunks else text
+            logger.info(f"Returning single chunk: {len(result_text)} chars")
+            return [(base_filename, result_text)], False
+        else:
+            # Multiple chunks - add sequence numbers
+            texts_with_filenames = []
+            for i, chunk in enumerate(chunks):
+                filename = f"{base_filename}_part_{i+1:03d}_of_{len(chunks):03d}"
+                texts_with_filenames.append((filename, chunk))
+                logger.debug(f"Chunk {i+1}: {filename} - {len(chunk)} chars")
+            
+            logger.info(f"Returning {len(texts_with_filenames)} chunks")
+            return texts_with_filenames, True
+            
+    except Exception as e:
+        logger.error(f"Error in prepare_chunked_texts: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        # Return original text as fallback
+        return [(base_filename, text)], False
 
 
 if __name__ == "__main__":

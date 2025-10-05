@@ -58,10 +58,6 @@ class TextTokenCollater:
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         seqs, seq_lens = [], []
         for tokens in tokens_list:
-            assert (
-                all([True if s in self.token2idx else False for s in tokens])
-                is True
-            )
             seq = (
                 ([self.bos_symbol] if self.add_bos else [])
                 + list(tokens)
@@ -76,7 +72,7 @@ class TextTokenCollater:
 
         tokens = torch.from_numpy(
             np.array(
-                [[self.token2idx[token] for token in seq] for seq in seqs],
+                [[self.token2idx.get(token, self.token2idx.get("[UNK]", 0)) for token in seq] for seq in seqs],
                 dtype=np.int64,
             )
         )
@@ -98,7 +94,7 @@ class TextTokenCollater:
 
         tokens_batch = torch.from_numpy(
             np.array(
-                [[self.token2idx[token] for token in seq] for seq in seqs],
+                [[self.token2idx.get(token, self.token2idx.get("[UNK]", 0)) for token in seq] for seq in seqs],
                 dtype=np.int64,
             )
         )

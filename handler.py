@@ -149,10 +149,20 @@ def handler(job):
                 )
                 
                 if not success or not audio_file_path or not audio_file_path.exists():
-                    return {
+                    error_details = {
                         "error": "Chunked audio generation failed",
-                        "chunk_info": chunk_info
+                        "chunk_info": chunk_info,
+                        "debug_info": {
+                            "success": success,
+                            "audio_file_path_exists": audio_file_path.exists() if audio_file_path else False,
+                            "audio_file_path": str(audio_file_path) if audio_file_path else None,
+                            "chunks_attempted": len(chunk_info),
+                            "text_length": len(text),
+                            "max_chunk_chars": max_chunk_chars
+                        }
                     }
+                    print(f"Chunked generation failed: {error_details}")
+                    return error_details
                 
                 # Read generated audio
                 with open(audio_file_path, 'rb') as f:

@@ -1,0 +1,20 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting num2words
+  Downloading num2words-0.5.14-py3-none-any.whl.metadata (13 kB)
+Collecting docopt>=0.6.2 (from num2words)
+  Downloading docopt-0.6.2.tar.gz (25 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Downloading num2words-0.5.14-py3-none-any.whl (163 kB)
+Building wheels for collected packages: docopt
+  Building wheel for docopt (pyproject.toml): started
+  Building wheel for docopt (pyproject.toml): finished with status 'done'
+  Created wheel for docopt: filename=docopt-0.6.2-py2.py3-none-any.whl size=13746 sha256=9fa9b34ee23f92575f02a66c86615b0ebf18f41e9e98b226f0b6644771baee48
+  Stored in directory: /home/lotan/.cache/pip/wheels/0b/1d/03/175286677fb5a1341cc3e4755bf8ec0ed08f3329afd67446b0
+Successfully built docopt
+Installing collected packages: docopt, num2words
+Successfully installed docopt-0.6.2 num2words-0.5.14
