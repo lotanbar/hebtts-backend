@@ -94,8 +94,8 @@ def handler(job):
         speaker = job_input["speaker"]
         
         # Optional parameters with defaults
-        top_k = job_input.get("top_k", 15)
-        temperature = job_input.get("temperature", 0.6)
+        top_k = job_input.get("top_k", 50)
+        temperature = job_input.get("temperature", 1.0)
         use_mbd = job_input.get("use_mbd", True)
         filename = job_input.get("filename", "output")
         enable_chunking = job_input.get("enable_chunking", True)
